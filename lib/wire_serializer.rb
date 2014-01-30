@@ -5,22 +5,19 @@ require 'json'
 class WireSerializer
   class << self
     def write(msg)
-      qualified_name = qualified_name_for_class(msg)
-      matches = qualified_name.match(/^ib\.(?<interface>\w+)\.v(?<version>\d+)\.(?<name>\w+)$/)
-      Ib::WireMessage.new(wire_version: 1,
-                          interface_name: matches[:interface],
-                          interface_version: matches[:version].to_i,
-                          message_type: matches[:name],
-                          message_data: msg.encode.to_s).encode.to_s
+      write_internal(msg, ->(x){x.encode.to_s})
+    end
+
+    def write_json(msg)
+      write_internal(msg, method(:to_json))
     end
 
     # returns nil if no corresponding class found
     def read(bytes)
       my_bytes = bytes.clone
-      wire_msg = Ib::WireMessage.decode(my_bytes)
-      puts "got message: #{to_json(wire_msg)}"
+      wire_msg = decode(Ib::WireMessage, my_bytes)
       the_class = ruby_class_for_qualified_name(qualified_name_for_msg(wire_msg))
-      the_class && the_class.decode(wire_msg.message_data)
+      the_class && decode(the_class, wire_msg.message_data)
     end
 
     def to_hash(obj)
@@ -52,6 +49,24 @@ class WireSerializer
     end
 
     private ##########################################################
+
+    def write_internal(msg, encode)
+      qualified_name = qualified_name_for_class(msg)
+      matches = qualified_name.match(/^ib\.(?<interface>\w+)\.v(?<version>\d+)\.(?<name>\w+)$/)
+      encode.(Ib::WireMessage.new(wire_version: 1,
+                                  interface_name: matches[:interface],
+                                  interface_version: matches[:version].to_i,
+                                  message_type: matches[:name],
+                                  message_data: encode.(msg)))
+    end
+
+    def decode(klass, bytes)
+      begin
+        klass.decode(bytes.dup)
+      rescue
+        from_json(klass, bytes)
+      end
+    end
 
     def qualified_name_for_class(msg)
       toks = msg.class.to_s.split('::')

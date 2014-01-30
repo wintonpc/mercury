@@ -1,6 +1,7 @@
 require 'amqp'
 require 'securerandom'
 require 'wire_serializer'
+require 'eventmachine'
 
 module Deferrable
 
@@ -57,7 +58,7 @@ class MercurySingleton
   end
 
   def send_to(name, msg)
-    serialized_msg = WireSerializer.write(msg)
+    serialized_msg = ENV['DEBUG'] ? WireSerializer.write_json(msg) : WireSerializer.write(msg)
     do_or_defer {@default_exchange.publish(serialized_msg, routing_key: name)}
   end
 end
