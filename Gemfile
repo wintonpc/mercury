@@ -6,6 +6,7 @@ gem 'amqp'
 gem 'activesupport-inflector'
 gem 'i18n'
 gem 'json'
+gem 'awesome_print'
 
 group :test do
 

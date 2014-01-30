@@ -1,8 +1,4 @@
-$LOAD_PATH << File.absolute_path(File.join(File.dirname(__FILE__), 'lib'))
-
-require 'eventmachine'
-require 'mercury'
-require 'messages'
+require_relative 'lib/messaging'
 
 EM.run do
   mercury = Mercury.new

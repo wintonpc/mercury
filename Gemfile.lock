@@ -6,6 +6,7 @@ GEM
     amqp (1.2.1)
       amq-protocol (>= 1.9.2)
       eventmachine
+    awesome_print (1.2.0)
     beefcake (0.5.0)
     eventmachine (1.0.3)
     i18n (0.6.5)
@@ -17,6 +18,7 @@ PLATFORMS
 DEPENDENCIES
   activesupport-inflector
   amqp
+  awesome_print
   beefcake
   eventmachine
   i18n
