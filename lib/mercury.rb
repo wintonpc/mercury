@@ -34,6 +34,18 @@ class Mercury
     do_or_defer {s.connect}
     s
   end
+
+  def self.request(dest_name, make_req, &handle_response)
+    EM.run do
+      mercury = Mercury.new
+      ms = mercury.new_singleton do |msg|
+        handle_response.(msg)
+        EM.stop
+      end
+
+      ms.send_to(dest_name, make_req.(ms.name))
+    end
+  end
 end
 
 class MercurySingleton
