@@ -1,0 +1,15 @@
+package ib;
+
+message WireMessage {
+
+  required int32 wire_version = 1;
+
+  required string interface_name = 2;
+
+  required int32 interface_version = 3;
+
+  required string message_type = 4;
+  
+  required bytes message_data = 5;
+
+}

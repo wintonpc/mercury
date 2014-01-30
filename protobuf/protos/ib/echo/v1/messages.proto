@@ -1,0 +1,10 @@
+package ib.echo.v1;
+
+message Request {
+  required string sender = 1;
+  required string content = 2;
+}
+
+message Response {
+  required string content = 1;
+}
