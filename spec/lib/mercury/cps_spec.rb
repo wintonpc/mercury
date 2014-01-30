@@ -1,0 +1,240 @@
+require 'spec_helper'
+require 'mercury/cps'
+
+describe Cps do
+  include Cps::Methods
+
+  let!(:a) { 123 }
+
+  describe '::lift' do
+    it 'CPS-transforms a non-CPS proc' do
+      expect(Cps.lift{rand}.run).to be_a Numeric
+    end
+  end
+
+  describe '::run' do
+    it 'passes the value to the continuation' do
+      expect{|b| lift{a}.run(&b)}.to yield_with_args(a)
+    end
+    it 'returns the return value of the continuation' do
+      expect(lift{a}.run{456}).to eql 456
+    end
+    it 'feeds its arguments into the Cps' do
+      expect{|b| Cps.identity.run(a, &b)}.to yield_with_args(a)
+    end
+  end
+
+  describe '#and_then' do
+    it 'composes two Cps instances' do
+      expect(lift{a}.and_then{|x| to_string(x)}.run).to eql a.to_s
+    end
+  end
+
+  describe '#and_lift' do
+    it 'composes a Cps instance with a normal proc' do
+      expect(lift{a}.and_lift{|x| x.to_s}.run).to eql a.to_s
+    end
+  end
+
+  describe '#recover' do
+    it 'installs an exception handler' do
+      caught = []
+      reached_end = false
+      lift{a}.and_lift{raise 'oops'}.recover{|e| lift{caught << e}}.run { reached_end = true }
+      expect(caught.size).to eql 1
+      expect(caught[0]).to be_a StandardError
+      expect(caught[0].message).to eql 'oops'
+      expect(reached_end).to be false
+    end
+    it 'the handler can re-raise' do
+      expect { lift{a}.and_lift{raise 'oops'}.recover{|e| raise e}.run}.to raise_error 'oops'
+    end
+    it 'the handler can continue' do
+      result = nil
+      lift{a}.and_lift{raise 'oops'}.recover{|_, cc| cc.call('recovered')}.run { |v| result = v}
+      expect(result).to eql 'recovered'
+    end
+    it 'tries multiple handlers' do
+      handle_if = proc do |type, e, &block|
+        if e.is_a?(type)
+          block.call
+        else
+          raise e
+        end
+      end
+      lift{a}.and_lift{raise ArgumentError.new}.
+        recover{|e, cc| handle_if.call(IOError, e) { cc.call('io', e) } }.
+        recover{|e, cc| handle_if.call(ArgumentError, e) { cc.call('argument', e) } }.
+        recover{|e, cc| handle_if.call(TypeError, e) { cc.call('type', e) } }.
+        run do |note, e|
+        expect(note).to eql 'argument'
+        expect(e).to be_a ArgumentError
+      end
+    end
+  end
+
+  describe '#finally' do
+    it 'does'
+  end
+
+  describe '::concurrently' do
+    it 'composes Cps instances concurrently' do
+      em do
+        actions = []
+        started1 = false
+        finished2 = false
+
+        task1 = proc do |n, &k|
+          actions << 'start1'
+          started1 = true
+          em_wait_until(proc{finished2}) do
+            actions << 'finish1'
+            k.call(n.to_s)
+          end
+        end
+        task2 = proc do |n, &k|
+          em_wait_until(proc{started1}) do
+            actions << 'start2'
+            actions << 'finish2'
+            finished2 = true
+            k.call(-1 * n)
+          end
+        end
+
+        result = nil
+        Cps.concurrently(Cps.new(&task1), Cps.new(&task2)).run(42) { |r| result = r }
+        em_wait_until(proc{result}) do
+          expect(result).to eql [['42'], [-42]]
+          expect(actions).to eql %w(start1 start2 finish2 finish1)
+          done
+        end
+      end
+    end
+  end
+
+  describe '::seq' do
+    it 'binds a sequence of monadic functions' do
+      result = Cps.seq do |th|
+        th.en { to_string(a) }
+        th.en { |v| twice(v) }
+        th.en { |v| reverse(v) }
+      end.run
+      expect(result).to eql '321321'
+    end
+    it 'can be chained' do
+      result = Cps.seq do |th|
+        th.en { to_string(a) }
+        th.en { |v| twice(v) }
+        th.en do |v|
+          Cps.seq do |th|
+            th.en { reverse(v)  }
+            th.en { |v| surround(v) }
+          end
+        end
+      end.run
+      expect(result).to eql '*321321*'
+    end
+  end
+
+  describe '::seql' do
+    it 'binds a sequence of monadic functions' do
+      result = Cps.seql do
+        let(:v)  { to_string(a) }
+        let(:v)  { twice(v) }
+        and_then { reverse(v) }
+      end.run
+      expect(result).to eql '321321'
+    end
+    it 'can be chained' do
+      result = Cps.seql do
+        let(:v) { to_string(a) }
+        let(:v) { twice(v) }
+        and_then do
+          Cps.seql do
+            let(:v) { reverse(v) }
+            and_then { surround(v) }
+          end
+        end
+      end.run
+      expect(result).to eql '*321321*'
+    end
+    it 'can be used like seq' do
+      result = Cps.seql do
+        and_then { to_string(a) }
+        and_then { |v| twice(v) }
+        and_then { |v| reverse(v) }
+      end.run
+      expect(result).to eql '321321'
+    end
+    it 'passes a bound value to the next function' do
+      result = Cps.seql do
+        let(:v) { to_string(a) }
+        and_then { |x| lift{x} }
+      end.run
+      expect(result).to eql '123'
+    end
+  end
+
+  describe '::identity' do
+    it 'passes its arguments to the continuation' do
+      expect{|b| Cps.identity.run(a, &b)}.to yield_with_args(a)
+    end
+  end
+
+  describe '#inject' do
+    it 'creates a Cps chain given an array and a transformation function' do
+      chain = lift{'entity'}.inject(['-ize', '-er']) do |suffix, v|
+        lift { v + suffix }
+      end
+      expect(chain.run).to eql 'entity-ize-er'
+    end
+  end
+
+# verify Cps obeys the monad laws (https://wiki.haskell.org/Monad_laws)
+# unit   ::= Cps::lift
+# bind   ::= Cps#and_then
+
+  it 'obeys the left identity law' do
+    # return a >>= f  ===  f a
+    expect_identical(lift{a}.and_then(&method(:to_string)),
+                     to_string(a),
+                     '123')
+  end
+
+  it 'obeys the right identity law' do
+    # m >>= return  === m
+    m = lift{123}
+    expect_identical(m.and_then{|x| lift{x}},
+                     m,
+                     123)
+  end
+
+  it 'obeys the associativity law' do
+    # (m >>= f) >>= g  ===  m >>= (\x -> f x >>= g)
+    m = lift{123}
+    expect_identical((m.and_then(&method(:to_string))).and_then(&method(:twice)),
+                     m.and_then {|x| to_string(x).and_then(&method(:twice)) },
+                     '123123')
+  end
+
+  def expect_identical(lhs, rhs, expected_value)
+    expect{|b| lhs.run(&b)}.to yield_with_args(expected_value)
+    expect{|b| rhs.run(&b)}.to yield_with_args(expected_value)
+  end
+
+  def to_string(x)
+    lift { x.to_s }
+  end
+
+  def twice(x)
+    lift { x * 2 }
+  end
+
+  def reverse(x)
+    lift { x.reverse }
+  end
+
+  def surround(x)
+    lift { "*#{x}*" }
+  end
+end
