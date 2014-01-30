@@ -1,5 +1,6 @@
 require 'amqp'
 require 'securerandom'
+require 'wire_serializer'
 
 module Deferrable
 
@@ -50,12 +51,13 @@ class MercurySingleton
     @default_exchange = @channel.direct('')
     @queue = @channel.queue(@name, exclusive: true, auto_delete: true, durable: false)
     @queue.subscribe do |payload|
-      @rcv.(payload)
+      @rcv.(WireSerializer.read(payload))
     end
     do_deferred
   end
 
   def send_to(name, msg)
-    do_or_defer {@default_exchange.publish(msg, routing_key: name)}
+    serialized_msg = WireSerializer.write(msg)
+    do_or_defer {@default_exchange.publish(serialized_msg, routing_key: name)}
   end
 end

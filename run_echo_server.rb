@@ -10,7 +10,6 @@ Response = Ib::Echo::V1::Response
 EM.run do
   mercury = Mercury.new
   ms = mercury.new_singleton 'echo-service' do |msg|
-    sender, content = msg.split(/ /)
-    ms.send_to(sender, "echo>> #{content} <<echo")
+    ms.send_to(msg.sender, Response.new(content: "echo>> #{msg.content} <<echo"))
   end
 end
