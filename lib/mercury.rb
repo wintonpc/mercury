@@ -46,18 +46,21 @@ class Mercury
     }
   end
 
-  def with_source(source_name, &block)
-    with_cached_source(source_name, @channel, &block)
-  end
-
-  def_cached :with_cached_source do |source_name, channel, k|
-    channel.fanout(source_name, durable: true, auto_delete: false) do |exchange|
-      k.(exchange, channel)
+  def with_source(source_name)
+    @source_exchanges ||= {}
+    exchange = @source_exchanges[source_name]
+    if exchange
+      yield exchange
+    else
+      @channel.fanout(source_name, durable: true, auto_delete: false) do |exchange|
+        @source_exchanges[source_name] = exchange
+        yield exchange
+      end
     end
   end
 
-  def with_work_queue(worker_group, source_exchange, channel)
-    queue = channel.queue(worker_group, durable: true, auto_delete: false)
+  def with_work_queue(worker_group, source_exchange)
+    queue = @channel.queue(worker_group, durable: true, auto_delete: false)
     queue.bind(source_exchange) do
       yield queue
     end
@@ -71,8 +74,8 @@ class Mercury
 
   def start_worker(worker_group, source_name, &rcv)
     do_or_defer {
-      with_source(source_name) do |exchange, channel|
-        with_work_queue(worker_group, exchange, channel) do |queue|
+      with_source(source_name) do |exchange|
+        with_work_queue(worker_group, exchange) do |queue|
           queue.subscribe(ack: true) do |metadata, payload|
             rcv.(WireSerializer.read(payload), ->{ metadata.ack })
           end
@@ -91,26 +94,6 @@ class Mercury
 
       mercury.send_to(dest_name, make_req.(ms.name))
       EM.stop unless handle_response
-    end
-  end
-
-  def self.def_cached(name, &body)
-    cache = {}
-    define_method name do |*args, &k|
-      cached(*args, cache, k, &body)
-    end
-  end
-
-  def cached(*args, cache, k, &block)
-    key = args.first
-    k_args = cache[key]
-    if k_args
-      k.(*k_args)
-    else
-      block.(*args, lambda { |*k_args|
-        cache[key] = k_args
-        k.(*k_args)
-      })
     end
   end
 

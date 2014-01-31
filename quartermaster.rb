@@ -28,7 +28,7 @@ class App < Sinatra::Base
                                Ib::ConverterService::V1::Request.new(site: site, batch: batch, sample: sample_name))
     end
     puts "inserted batch #{batch} in site #{site} with samples #{samples}\n"
-    '{"success":true}'
+    {success: true}.to_json
   end
 
   def insert_batch(site, batch_name, sample_names)
