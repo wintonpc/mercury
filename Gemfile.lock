@@ -15,6 +15,9 @@ GEM
       eventmachine
     awesome_print (1.2.0)
     beefcake (0.5.0)
+    bson (1.9.2)
+    bson_ext (1.9.2)
+      bson (~> 1.9.2)
     builder (3.0.4)
     cookiejar (0.3.0)
     daemons (1.1.9)
@@ -33,6 +36,8 @@ GEM
     http_parser.rb (0.6.0)
     i18n (0.6.5)
     json (1.7.7)
+    mongo (1.9.2)
+      bson (~> 1.9.2)
     mongoid (3.1.6)
       activemodel (~> 3.2)
       moped (~> 1.4)
@@ -71,9 +76,11 @@ DEPENDENCIES
   amqp
   awesome_print
   beefcake
+  bson_ext
   eventmachine
   i18n
   json
+  mongo
   mongoid
   sinatra-synchrony
   thin
