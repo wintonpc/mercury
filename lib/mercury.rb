@@ -126,4 +126,8 @@ class MercurySingleton
   def send_to(*args)
     @mercury.send_to(*args)
   end
+
+  def close
+    @queue and @queue.delete(nowait: true)
+  end
 end

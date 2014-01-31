@@ -1,7 +1,8 @@
 require_relative 'lib/messaging'
+require 'mutex_client'
 require 'time'
 require 'ap'
 
 EM.run do
-  Mercury.new.publish('mutex-requests', Ib::Mutex::V1::Release.new(token: ARGV[0])) { EM.stop }
+  MutexClient.release(Mercury.new, ARGV[0]) { EM.stop }
 end
