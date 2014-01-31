@@ -44,6 +44,7 @@ class Mercury
       end
 
       ms.send_to(dest_name, make_req.(ms.name))
+      EM.stop unless handle_response
     end
   end
 end
@@ -63,8 +64,10 @@ class MercurySingleton
     @channel = AMQP::Channel.new(@mercury.amqp)
     @default_exchange = @channel.direct('')
     @queue = @channel.queue(@name, exclusive: true, auto_delete: true, durable: false)
-    @queue.subscribe do |payload|
-      @rcv.(WireSerializer.read(payload))
+    if @rcv
+      @queue.subscribe do |payload|
+        @rcv.(WireSerializer.read(payload))
+      end
     end
     do_deferred
   end

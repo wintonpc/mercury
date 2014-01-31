@@ -7,6 +7,9 @@ gem 'activesupport-inflector'
 gem 'i18n'
 gem 'json'
 gem 'awesome_print'
+gem 'sinatra-synchrony'
+gem 'mongoid'
+gem 'thin'
 
 group :test do
 
