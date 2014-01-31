@@ -4,6 +4,7 @@ require 'ap'
 
 def request_mutex(mercury, resource)
   ms = mercury.new_singleton do |response|
+    ap WireSerializer.to_hash(response)
     yield(response.was_obtained ? response.release_token : nil)
   end
   mercury.publish 'mutex-requests', Ib::Mutex::V1::Request.new(requestor: ms.name, owner_name: ms.name, resource: resource)

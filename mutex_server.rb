@@ -34,7 +34,7 @@ class MutexServer
     timeout = 10 * 1000
     pred = "function() { return !this.held || (ISODate() - this.last_obtained) > #{timeout}; }"
     release_token = SecureRandom.uuid
-    request_time = DateTime.now
+    request_time = Time.now
     updated_mutex = IbMutex.
         where(_id: m.id, '$where' => pred).
         find_and_modify({
@@ -47,8 +47,7 @@ class MutexServer
                         })
 
     was_obtained = !updated_mutex.nil?
-    was_abandoned = was_obtained && updated_mutex.held && request_time - updated_mutex.last_obtained > timeout
-    
+    was_abandoned = was_obtained && updated_mutex.held && ((request_time - updated_mutex.last_obtained) * 1000).to_i > timeout
     @mercury.send_to msg.requestor, Ib::Mutex::V1::Response.new(request: msg,
                                                                was_obtained: was_obtained,
                                                                obtained_abandoned: was_abandoned,
@@ -56,9 +55,9 @@ class MutexServer
     ack.()
   end
 
-  def handle_release(msg, ack)
-    puts "released #{msg.resource}"
-    IbMutex.where(release_token: msg.release_token, held: true).find_and_modify({ '$set' => { held: false } })
+  def handle_release(release_msg, ack)
+    old = IbMutex.where(release_token: release_msg.token, held: true).find_and_modify({ '$set' => { held: false } })
+    puts "released #{old.resource}" if old
     ack.()
   end
 end

@@ -5,7 +5,7 @@ class IbMutex
 
   field :resource, type: String
   field :held, type: Boolean
-  field :last_obtained, type: DateTime
+  field :last_obtained, type: Time
   field :owner, type: String
   field :release_token, type: String
 end
