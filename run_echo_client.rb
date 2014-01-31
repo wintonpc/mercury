@@ -13,7 +13,7 @@ EM.run do
   end
 
   EM.on_keyboard_line do |line|
-    ms.send_to('echo-service', Ib::Echo::V1::Request.new(sender: ms.name, content: line))
+    mercury.send_to('echo-service', Ib::Echo::V1::Request.new(sender: ms.name, content: line))
   end
 
 end

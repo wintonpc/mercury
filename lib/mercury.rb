@@ -20,13 +20,23 @@ end
 class Mercury
   include Deferrable
 
-  attr_accessor :amqp
+  attr_accessor :amqp, :channel
 
   def initialize
     AMQP.connect(:host => 'localhost') do |amqp|
       @amqp = amqp
-      do_deferred
+      @channel = AMQP::Channel.new(amqp) do
+        @default_exchange = @channel.direct('')
+        do_deferred
+      end
     end
+  end
+
+  def send_to(name, msg)
+    do_or_defer {
+      serialized_msg = ENV['DEBUG'] ? WireSerializer.write_json(msg) : WireSerializer.write(msg)
+      @default_exchange.publish(serialized_msg, routing_key: name)
+    }
   end
 
   def new_singleton(name = nil, &rcv)
@@ -43,7 +53,7 @@ class Mercury
         EM.stop
       end
 
-      ms.send_to(dest_name, make_req.(ms.name))
+      mercury.send_to(dest_name, make_req.(ms.name))
       EM.stop unless handle_response
     end
   end
@@ -61,19 +71,17 @@ class MercurySingleton
   end
 
   def connect
-    @channel = AMQP::Channel.new(@mercury.amqp)
-    @default_exchange = @channel.direct('')
-    @queue = @channel.queue(@name, exclusive: true, auto_delete: true, durable: false)
-    if @rcv
-      @queue.subscribe do |payload|
-        @rcv.(WireSerializer.read(payload))
+    @queue = @mercury.channel.queue(@name, exclusive: true, auto_delete: true, durable: false) do |queue|
+      if @rcv
+        queue.subscribe do |payload|
+          @rcv.(WireSerializer.read(payload))
+        end
       end
+      do_deferred
     end
-    do_deferred
   end
 
-  def send_to(name, msg)
-    serialized_msg = ENV['DEBUG'] ? WireSerializer.write_json(msg) : WireSerializer.write(msg)
-    do_or_defer {@default_exchange.publish(serialized_msg, routing_key: name)}
+  def send_to(*args)
+    @mercury.send_to(*args)
   end
 end
