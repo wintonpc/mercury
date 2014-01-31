@@ -1,0 +1,18 @@
+package ib.mutex.v1;
+
+message Request {
+  required string requestor = 1;
+  required string owner_name = 2;
+  required string resource = 3;
+}
+
+message Response {
+  required Request request = 1;
+  optional string release_token = 2;
+  required bool was_obtained = 3;
+  required bool obtained_abandoned = 4;
+}
+
+message Release {
+  required string token = 1;
+}

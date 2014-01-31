@@ -4,8 +4,6 @@ require 'model/batch'
 require 'mongoid'
 require 'sinatra/base'
 
-Mongoid.load!('config/mongoid.yml')
-
 class App < Sinatra::Base
   configure do
     EM.next_tick {

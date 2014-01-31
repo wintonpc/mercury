@@ -20,7 +20,7 @@ end
 class Mercury
   include Deferrable
 
-  attr_accessor :amqp, :default_channel
+  attr_accessor :amqp, :channel
 
   def initialize
     AMQP.connect(:host => 'localhost') do |amqp|
@@ -38,10 +38,10 @@ class Mercury
     }
   end
 
-  def publish(source_name, msg)
+  def publish(source_name, msg, &block)
     do_or_defer {
       with_source(source_name) do |exchange|
-        exchange.publish(write(msg), delivery_mode: 2)
+        exchange.publish(write(msg), delivery_mode: 2, &block)
       end
     }
   end
@@ -88,12 +88,11 @@ class Mercury
     EM.run do
       mercury = Mercury.new
       ms = mercury.new_singleton do |msg|
-        handle_response.(msg)
+        handle_response && handle_response.(msg)
         EM.stop
       end
 
-      mercury.send_to(dest_name, make_req.(ms.name))
-      EM.stop unless handle_response
+      mercury.send_to(dest_name, make_req.respond_to?(:call) ? make_req.(ms.name) : make_req)
     end
   end
 
@@ -114,7 +113,7 @@ class MercurySingleton
   end
 
   def connect
-    @queue = @mercury.default_channel.queue(@name, exclusive: true, auto_delete: true, durable: false) do |queue|
+    @queue = @mercury.channel.queue(@name, exclusive: true, auto_delete: true, durable: false) do |queue|
       if @rcv
         queue.subscribe do |payload|
           @rcv.(WireSerializer.read(payload))
