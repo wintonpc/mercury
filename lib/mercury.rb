@@ -23,6 +23,8 @@ class Mercury
   attr_accessor :amqp, :channel
 
   def initialize
+    @exchanges = {}
+    @worker_queues = {}
     AMQP.connect(:host => 'localhost') do |amqp|
       @amqp = amqp
       @channel = AMQP::Channel.new(amqp) do
@@ -34,15 +36,59 @@ class Mercury
 
   def send_to(name, msg)
     do_or_defer {
-      serialized_msg = ENV['DEBUG'] ? WireSerializer.write_json(msg) : WireSerializer.write(msg)
-      @default_exchange.publish(serialized_msg, routing_key: name)
+      @default_exchange.publish(write(msg), routing_key: name)
     }
+  end
+
+  def publish(source_name, msg)
+    do_or_defer {
+      with_source(source_name) do |exchange|
+        exchange.publish(write(msg), delivery_mode: 2)
+      end
+    }
+  end
+
+  def with_source(source_name)
+    exchange = @exchanges[source_name]
+    if exchange
+      yield exchange
+    else
+      @channel.fanout(source_name, durable: true, auto_delete: false) do |exchange|
+        @exchanges[source_name] = exchange
+        yield exchange
+      end
+    end
+  end
+
+  def with_work_queue(worker_group, source_exchange)
+    queue = @worker_queues[worker_group]
+    if queue
+      yield queue
+    else
+      queue = @channel.queue(worker_group, durable: true, auto_delete: false)
+      queue.bind(source_exchange) do
+        @worker_queues[worker_group] = queue
+        yield queue
+      end
+    end
   end
 
   def new_singleton(name = nil, &rcv)
     s = MercurySingleton.new(self, name, &rcv)
     do_or_defer {s.connect}
     s
+  end
+
+  def start_worker(worker_group, source_name, &rcv)
+    do_or_defer {
+      with_source(source_name) do |exchange|
+        with_work_queue(worker_group, exchange) do |queue|
+          queue.subscribe(ack: true) do |metadata, payload|
+            rcv.(WireSerializer.read(payload), ->{ metadata.ack })
+          end
+        end
+      end
+    }
   end
 
   def self.request(dest_name, make_req, &handle_response)
@@ -56,6 +102,10 @@ class Mercury
       mercury.send_to(dest_name, make_req.(ms.name))
       EM.stop unless handle_response
     end
+  end
+
+  def write(msg)
+    ENV['DEBUG'] ? WireSerializer.write_json(msg) : WireSerializer.write(msg)
   end
 end
 

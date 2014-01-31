@@ -1,0 +1,12 @@
+package ib.converterService.v1;
+
+message Request {
+  required string site = 1;
+  required string batch = 2;
+  required string sample = 3;
+}
+
+message Notification {
+  required bool success = 1;
+  required Request request = 2;
+}

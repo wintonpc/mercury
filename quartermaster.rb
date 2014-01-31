@@ -4,14 +4,16 @@ require File.join(File.dirname(__FILE__), 'lib/messaging')
 require 'model/batch'
 require 'mongoid'
 
+Mongoid.load!('config/mongoid.yml')
+
 class App < Sinatra::Base
   register Sinatra::Synchrony
 
   configure do
     EM.next_tick {
-      Mongoid.load!("config/mongoid.yml")
       mercury = Mercury.new
-      #mercury.start_worker 'quartermaster-conversion-worker', &method(handle_convert_notification)
+      mercury.start_worker 'quartermaster-conversion-worker', 'convert-notifications',
+                           &App.method(:handle_convert_notification)
 
       set :mercury, mercury
     }
@@ -19,8 +21,14 @@ class App < Sinatra::Base
 
   post '/upload' do
     msg = JSON.parse(request.body.read)
-    insert_batch(msg['site'], msg['batch'], msg['samples'])
-    "inserted batch #{msg['batch']} in site #{msg['site']} with samples #{msg['samples']}\n"
+    site, batch, samples = msg['site'], msg['batch'], msg['samples']
+    insert_batch(site, batch, samples)
+    msg['samples'].each do |sample_name|
+      settings.mercury.publish('convert-requests',
+                               Ib::ConverterService::V1::Request.new(site: site, batch: batch, sample: sample_name))
+    end
+    puts "inserted batch #{batch} in site #{site} with samples #{samples}\n"
+    '{"success":true}'
   end
 
   def insert_batch(site, batch_name, sample_names)
@@ -29,8 +37,9 @@ class App < Sinatra::Base
     batch.save!
   end
 
-  def handle_convert_notification(msg)
-
+  def self.handle_convert_notification(msg, ack)
+    puts "got convert notification: #{WireSerializer.to_hash(msg)}"
+    ack.()
   end
 
 end
