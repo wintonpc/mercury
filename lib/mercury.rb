@@ -25,8 +25,8 @@ class Mercury
   def initialize
     AMQP.connect(:host => 'localhost') do |amqp|
       @amqp = amqp
-      @default_channel = AMQP::Channel.new(amqp) do
-        @default_exchange = @default_channel.direct('')
+      @channel = AMQP::Channel.new(amqp, prefetch: 1) do
+        @default_exchange = @channel.direct('')
         do_deferred
       end
     end
@@ -46,10 +46,13 @@ class Mercury
     }
   end
 
-  def with_source(source_name)
-    channel = AMQP::Channel.new(@amqp, prefetch: 1)
+  def with_source(source_name, &block)
+    with_cached_source(source_name, @channel, &block)
+  end
+
+  def_cached :with_cached_source do |source_name, channel, k|
     channel.fanout(source_name, durable: true, auto_delete: false) do |exchange|
-      yield exchange, channel
+      k.(exchange, channel)
     end
   end
 
@@ -88,6 +91,26 @@ class Mercury
 
       mercury.send_to(dest_name, make_req.(ms.name))
       EM.stop unless handle_response
+    end
+  end
+
+  def self.def_cached(name, &body)
+    cache = {}
+    define_method name do |*args, &k|
+      cached(*args, cache, k, &body)
+    end
+  end
+
+  def cached(*args, cache, k, &block)
+    key = args.first
+    k_args = cache[key]
+    if k_args
+      k.(*k_args)
+    else
+      block.(*args, lambda { |*k_args|
+        cache[key] = k_args
+        k.(*k_args)
+      })
     end
   end
 
