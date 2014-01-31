@@ -1,16 +1,24 @@
 source 'https://rubygems.org'
 
-gem 'beefcake'
+# pump
 gem 'eventmachine'
+
+# messaging
+gem 'beefcake'
 gem 'amqp'
+
+# misc
 gem 'activesupport-inflector'
 gem 'i18n'
-gem 'json'
 gem 'awesome_print'
-gem 'sinatra-synchrony'
+
+# mongo
 gem 'mongo'
 gem 'mongoid'
 gem 'bson_ext'
+
+# web
+gem 'sinatra'
 gem 'thin'
 
 group :test do
