@@ -20,15 +20,13 @@ end
 class Mercury
   include Deferrable
 
-  attr_accessor :amqp, :channel
+  attr_accessor :amqp, :default_channel
 
   def initialize
-    @exchanges = {}
-    @worker_queues = {}
     AMQP.connect(:host => 'localhost') do |amqp|
       @amqp = amqp
-      @channel = AMQP::Channel.new(amqp) do
-        @default_exchange = @channel.direct('')
+      @default_channel = AMQP::Channel.new(amqp) do
+        @default_exchange = @default_channel.direct('')
         do_deferred
       end
     end
@@ -49,27 +47,16 @@ class Mercury
   end
 
   def with_source(source_name)
-    exchange = @exchanges[source_name]
-    if exchange
-      yield exchange
-    else
-      @channel.fanout(source_name, durable: true, auto_delete: false) do |exchange|
-        @exchanges[source_name] = exchange
-        yield exchange
-      end
+    channel = AMQP::Channel.new(@amqp, prefetch: 1)
+    channel.fanout(source_name, durable: true, auto_delete: false) do |exchange|
+      yield exchange, channel
     end
   end
 
-  def with_work_queue(worker_group, source_exchange)
-    queue = @worker_queues[worker_group]
-    if queue
+  def with_work_queue(worker_group, source_exchange, channel)
+    queue = channel.queue(worker_group, durable: true, auto_delete: false)
+    queue.bind(source_exchange) do
       yield queue
-    else
-      queue = @channel.queue(worker_group, durable: true, auto_delete: false)
-      queue.bind(source_exchange) do
-        @worker_queues[worker_group] = queue
-        yield queue
-      end
     end
   end
 
@@ -81,8 +68,8 @@ class Mercury
 
   def start_worker(worker_group, source_name, &rcv)
     do_or_defer {
-      with_source(source_name) do |exchange|
-        with_work_queue(worker_group, exchange) do |queue|
+      with_source(source_name) do |exchange, channel|
+        with_work_queue(worker_group, exchange, channel) do |queue|
           queue.subscribe(ack: true) do |metadata, payload|
             rcv.(WireSerializer.read(payload), ->{ metadata.ack })
           end
@@ -121,7 +108,7 @@ class MercurySingleton
   end
 
   def connect
-    @queue = @mercury.channel.queue(@name, exclusive: true, auto_delete: true, durable: false) do |queue|
+    @queue = @mercury.default_channel.queue(@name, exclusive: true, auto_delete: true, durable: false) do |queue|
       if @rcv
         queue.subscribe do |payload|
           @rcv.(WireSerializer.read(payload))
