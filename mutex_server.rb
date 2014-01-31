@@ -7,16 +7,31 @@ require 'securerandom'
 ENV['MONGOID_ENV'] = 'development'
 Mongoid.load!('config/mongoid.yml')
 
-EM.run do
-  mercury = Mercury.new
-  mercury.start_worker 'mutex-server', 'mutex-requests' do |msg, ack|
+class MutexServer
 
+  def start
+    EM.run do
+      @mercury = Mercury.new
+      @mercury.start_worker 'mutex-server', 'mutex-requests' do |msg, ack|
+        case msg
+          when Ib::Mutex::V1::Request
+            handle_request(msg, ack)
+          when Ib::Mutex::V1::Release
+            handle_release(msg, ack)
+          else
+            puts "Unexpected message: #{msg.class.name}"
+        end
+      end
+    end
+  end
+
+  def handle_request(msg, ack)
     m = IbMutex.
         where(resource: msg.resource).
         find_and_modify({'$setOnInsert' => { resource: msg.resource, held: false }}, upsert: true, new: true)
 
     puts "got request for #{msg.resource}"
-    timeout = 30 * 1000
+    timeout = 10 * 1000
     pred = "function() { return !this.held || (ISODate() - this.last_obtained) > #{timeout}; }"
     release_token = SecureRandom.uuid
     request_time = DateTime.now
@@ -30,13 +45,22 @@ EM.run do
                                 release_token: release_token
                             }
                         })
-    puts "updated?: #{updated_mutex ? updated_mutex.attributes : 'no'}"
+
     was_obtained = !updated_mutex.nil?
-    was_abandoned = updated_mutex && updated_mutex.held && request_time - updated_mutex.last_obtained > timeout
-    mercury.send_to msg.requestor, Ib::Mutex::V1::Response(request: msg,
-                                                           was_obtained: was_obtained,
-                                                           obtained_abandoned: was_abandoned,
-                                                           release_token: was_obtained ? nil : release_token)
+    was_abandoned = was_obtained && updated_mutex.held && request_time - updated_mutex.last_obtained > timeout
+    
+    @mercury.send_to msg.requestor, Ib::Mutex::V1::Response.new(request: msg,
+                                                               was_obtained: was_obtained,
+                                                               obtained_abandoned: was_abandoned,
+                                                               release_token: was_obtained ? release_token : nil)
+    ack.()
+  end
+
+  def handle_release(msg, ack)
+    puts "released #{msg.resource}"
+    IbMutex.where(release_token: msg.release_token, held: true).find_and_modify({ '$set' => { held: false } })
     ack.()
   end
 end
+
+MutexServer.new.start
