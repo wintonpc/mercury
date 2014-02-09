@@ -1,5 +1,6 @@
 require 'fileutils'
 require 'active_support/inflector'
+require 'colorize'
 
 Dir.glob('protos/ib/**/*.proto').each do |proto_path|
   proto_dir = File.dirname(proto_path).sub(/^protos\//, '')
@@ -8,7 +9,8 @@ Dir.glob('protos/ib/**/*.proto').each do |proto_path|
   out_dir = "./ruby/#{proto_dir.sub(/^ib\/?/, '')}"
   FileUtils.mkdir_p "#{out_dir}"
 
-  cmd = "BEEFCAKE_NAMESPACE=#{namespace} protoc --beefcake_out #{out_dir} --proto_path=protos #{proto_path}"
-  result = system(cmd) ? 'SUCCESS' : 'FAILED '
-  puts "#{result} #{cmd}"
+  cmd = "protoc --beefcake_out #{out_dir} --proto_path=protos #{proto_path}"
+  ENV['BEEFCAKE_NAMESPACE'] = namespace
+  result = system(cmd) ? '✔'.green : '✘'.red
+  puts "#{result} BEEFCAKE_NAMESPACE=#{namespace} #{cmd}"
 end

@@ -4,6 +4,9 @@ require 'model/batch'
 require 'mongoid'
 require 'sinatra/base'
 
+ENV['MONGOID_ENV'] = 'development'
+Mongoid.load!('config/mongoid.yml')
+
 class App < Sinatra::Base
   configure do
     EM.next_tick {
