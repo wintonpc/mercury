@@ -8,10 +8,13 @@ module Handler
   end
 
   def receive_data(bytes)
-    pipe.write(bytes)
+    @pipe.pipe_in(bytes)
   end
 
   def receive_msg(msg)
+    response = Ib::Mutex::V1::Response.new(request: msg, release_token: 'foo',
+                                           was_obtained: false, obtained_abandoned: false)
+    send_data(MsgPipe.write(response))
   end
 
   def unbind
@@ -21,4 +24,5 @@ end
 
 EM.run do
   EM.start_server '0.0.0.0', 7890, Handler
+  puts 'Listening...'
 end
