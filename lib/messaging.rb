@@ -4,6 +4,7 @@ require 'eventmachine'
 require 'mercury'
 require 'messages'
 require 'eventmachine_util'
+require 'msg_pipe'
 
 # hack to fix equality failure in awesome_print
 # beefcake's default == assumes the RHS is another beefcake message
