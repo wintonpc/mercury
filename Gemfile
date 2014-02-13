@@ -11,8 +11,8 @@ gem 'amqp'
 gem 'activesupport-inflector'
 gem 'i18n'
 gem 'awesome_print'
-gem 'json'
-gem 'rubysl'
+#gem 'json'
+#gem 'rubysl'
 
 # mongo
 gem 'mongo'

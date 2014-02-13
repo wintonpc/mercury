@@ -8,12 +8,12 @@ class BinBuf
   end
 
   def unread_uint(uint)
-    @chunks.unshift([uint].pack('L'))
+    @chunks.unshift([uint].pack('N'))
   end
 
   def read_uint
     bytes = read(4)
-    bytes ? bytes.unpack('L').first : nil
+    bytes ? bytes.unpack('N').first : nil
   end
 
   def read(num_to_read)

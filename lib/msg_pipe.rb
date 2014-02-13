@@ -20,7 +20,7 @@ class MsgPipe
 
   def self.write(msg)
     payload = WireSerializer.write(msg)
-    [payload.bytesize].pack('L') + payload
+    [payload.bytesize].pack('N') + payload
   end
 
   private
