@@ -22,14 +22,13 @@ func main() {
 func OnClientConnect(conn net.Conn) {
 	fmt.Println("Client connected")
 	for {
-		//chunk, err := readChunk(conn)
-		theInt, err := readUint(conn)
+		chunk, err := readChunk(conn)
 		if err != nil {
 			fmt.Println("Client disconnected")
 			return
 		}
 		checkError(err)
-		fmt.Print(theInt)
+		fmt.Print(string(chunk))
 	}
 }
 
@@ -40,10 +39,11 @@ func checkError(err error) {
 }
 
 func readChunk(conn net.Conn) ([]byte, error) {
-	length, err := readUint(conn)
+	length, err := readUint32(conn)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("Reading chunk size %d\n", length)
 	bytes, err := readN(length, conn)
 	if err != nil {
 		return nil, err
@@ -51,23 +51,23 @@ func readChunk(conn net.Conn) ([]byte, error) {
 	return bytes, nil
 }
 
-func readUint(conn net.Conn) (uint, error) {
+func readUint32(conn net.Conn) (uint32, error) {
 	buf, err := readN(4, conn)
 	if err != nil {
 		return 0, err
 	}
-	return binary.LittleEndian.Uint32(buf), nil
+	return binary.BigEndian.Uint32(buf), nil
 }
 
-func readN(length uint, conn net.Conn) ([]byte, error) {
+func readN(length uint32, conn net.Conn) ([]byte, error) {
 	buf := make([]byte, length)
-	nRead := uint(0)
+	nRead := uint32(0)
 	for nRead < length {
 		n, err := conn.Read(buf[nRead:])
 		if err != nil {
 			return nil, err
 		}
-		nRead = nRead + uint(n)
+		nRead = nRead + uint32(n)
 	}
 	return buf, nil
 }
