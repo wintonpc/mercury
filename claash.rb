@@ -45,8 +45,9 @@ class Client < EM::Connection
         Client.inc_completed_client_count
         if Client.completed_client_count == CLIENT_COUNT
           elapsed = Time.now - START
-          puts "elapsed seconds: #{elapsed}"
+          #puts "elapsed seconds: #{elapsed}"
           puts "milliseconds/msg: #{elapsed / (CLIENT_COUNT * MSG_COUNT) * 1000}"
+          puts "messages/second: #{(CLIENT_COUNT * MSG_COUNT) / elapsed}"
           EM.stop
         end
       end
