@@ -31,31 +31,31 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		checkError(err)
-		go OnClientConnect(conn)
+		go onClientConnect(conn)
 	}
 }
 
-func OnClientConnect(conn net.Conn) {
+func onClientConnect(conn net.Conn) {
 	fmt.Println("Client connected")
 	defer func() {
 		fmt.Println("Client disconnected:", recover())
 	}()
 	for {
-		chunk := readChunk(conn)
-		wireRead(chunk)
+		msg := wireRead(readChunk(conn))
+		fmt.Println("got msg:", msg)
 	}
 }
 
-type Msg interface{}
-
-func wireRead(buf []byte) Msg {
+func wireRead(buf []byte) proto.Message {
 	wireMsg := &ib.WireMessage{}
 	err := proto.Unmarshal(buf, wireMsg)
 	checkError(err)
 	fqn := fmt.Sprintf("%v.v%v.%v", wireMsg.GetInterfaceName(), wireMsg.GetInterfaceVersion(), wireMsg.GetMessageType())
 	msgType := typeFor[fqn]
-	fmt.Printf("wireRead %v\n", msgType)
-	return nil
+	msg := reflect.New(msgType).Interface().(proto.Message)
+	err = proto.Unmarshal(wireMsg.GetMessageData(), msg)
+	checkError(err)
+	return msg
 }
 
 func checkError(err error) {
