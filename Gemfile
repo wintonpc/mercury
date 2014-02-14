@@ -11,6 +11,7 @@ gem 'amqp'
 gem 'activesupport-inflector'
 gem 'i18n'
 gem 'awesome_print'
+gem 'colorize'
 #gem 'json'
 #gem 'rubysl'
 

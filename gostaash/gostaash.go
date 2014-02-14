@@ -1,12 +1,28 @@
 package main
 
 import (
+	"code.google.com/p/goprotobuf/proto"
 	"encoding/binary"
 	"fmt"
+	"gostaash/ib"
+	"gostaash/ib/mutex/v1"
 	"net"
+	"reflect"
 )
 
+var typeFor map[string]reflect.Type = make(map[string]reflect.Type)
+
+func typeOf(x interface{}) reflect.Type {
+	return reflect.TypeOf(x).Elem()
+}
+
+func createProtoTypeMap() {
+	typeFor["mutex.v1.Request"] = typeOf((*ib_mutex_v1.Request)(nil))
+	typeFor["mutex.v1.Response"] = typeOf((*ib_mutex_v1.Response)(nil))
+}
+
 func main() {
+	createProtoTypeMap()
 	addr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:7890")
 	checkError(err)
 	listener, err := net.ListenTCP("tcp", addr)
@@ -27,9 +43,22 @@ func OnClientConnect(conn net.Conn) {
 			fmt.Println("Client disconnected")
 			return
 		}
+		wireRead(chunk)
 		checkError(err)
-		fmt.Print(string(chunk))
+
 	}
+}
+
+type Msg interface{}
+
+func wireRead(buf []byte) Msg {
+	wireMsg := &ib.WireMessage{}
+	err := proto.Unmarshal(buf, wireMsg)
+	checkError(err)
+	fqn := fmt.Sprintf("%v.v%v.%v", wireMsg.GetInterfaceName(), wireMsg.GetInterfaceVersion(), wireMsg.GetMessageType())
+	msgType := typeFor[fqn]
+	fmt.Printf("wireRead %v\n", msgType)
+	return nil
 }
 
 func checkError(err error) {
@@ -43,7 +72,6 @@ func readChunk(conn net.Conn) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("Reading chunk size %d\n", length)
 	bytes, err := readN(length, conn)
 	if err != nil {
 		return nil, err
