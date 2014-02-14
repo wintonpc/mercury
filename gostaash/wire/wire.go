@@ -8,9 +8,12 @@ import (
 	"gostaash/ib/mutex/v1"
 	"net"
 	"reflect"
+	"regexp"
+	"strconv"
 )
 
 var typeFor map[string]reflect.Type = make(map[string]reflect.Type)
+var fqnFor map[reflect.Type]string = make(map[reflect.Type]string)
 
 func typeOf(x interface{}) reflect.Type {
 	return reflect.TypeOf(x).Elem()
@@ -23,10 +26,37 @@ func Initialize() {
 func createProtoTypeMap() {
 	typeFor["mutex.v1.Request"] = typeOf((*ib_mutex_v1.Request)(nil))
 	typeFor["mutex.v1.Response"] = typeOf((*ib_mutex_v1.Response)(nil))
+	for k, v := range typeFor {
+		fqnFor[v] = k
+	}
 }
 
-func ReadMsg(conn net.Conn) proto.Message {
+func ReadMsg(conn net.Conn) interface{} {
 	return Deserialize(ReadChunk(conn))
+}
+
+func WriteMsg(msg proto.Message, conn net.Conn) {
+	iface, ver, msgType := parseFqn(fqnFor[reflect.TypeOf(msg).Elem()])
+	wireMsg := &ib.WireMessage{
+		WireVersion:      proto.Int32(1),
+		InterfaceName:    &iface,
+		InterfaceVersion: &ver,
+		MessageType:      &msgType,
+		MessageData:      marshal(msg),
+	}
+	wireMsgBuf := marshal(wireMsg)
+	lenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(lenBytes, uint32(len(wireMsgBuf)))
+	conn.Write(lenBytes)
+	conn.Write(wireMsgBuf)
+}
+
+func parseFqn(fqn string) (iface string, ver int32, msgType string) {
+	re := regexp.MustCompile("^(?P<interface>[A-Za-z0-9_]+).v(?P<version>[0-9]+).(?P<name>[A-Za-z0-9_]+)$")
+	submatches := re.FindStringSubmatch(fqn)
+	ver64, err := strconv.ParseUint(submatches[2], 0, 32)
+	checkError(err)
+	return submatches[1], int32(ver64), submatches[3]
 }
 
 func Deserialize(buf []byte) proto.Message {
@@ -44,6 +74,12 @@ func unmarshal(buf []byte, t reflect.Type) proto.Message {
 	err := proto.Unmarshal(buf, msg)
 	checkError(err)
 	return msg
+}
+
+func marshal(msg proto.Message) []byte {
+	buf, err := proto.Marshal(msg)
+	checkError(err)
+	return buf
 }
 
 func checkError(err error) {

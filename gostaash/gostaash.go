@@ -1,7 +1,9 @@
 package main
 
 import (
+	"code.google.com/p/goprotobuf/proto"
 	"fmt"
+	"gostaash/ib/mutex/v1"
 	"gostaash/wire"
 	"net"
 )
@@ -21,13 +23,23 @@ func main() {
 }
 
 func onClientConnect(conn net.Conn) {
-	fmt.Println("Client connected")
+	//fmt.Println("Client connected")
 	defer func() {
-		fmt.Println("Client disconnected:", recover())
+		recover()
+		//fmt.Println("Client disconnected:", recover())
 	}()
 	for {
 		msg := wire.ReadMsg(conn)
-		fmt.Println("got msg:", msg)
+		switch msg.(type) {
+		case *ib_mutex_v1.Request:
+			response := &ib_mutex_v1.Response{
+				Request:           msg.(*ib_mutex_v1.Request),
+				ReleaseToken:      proto.String("foo"),
+				WasObtained:       proto.Bool(false),
+				ObtainedAbandoned: proto.Bool(false),
+			}
+			wire.WriteMsg(response, conn)
+		}
 	}
 }
 
