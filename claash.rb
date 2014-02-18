@@ -1,59 +1,13 @@
 require_relative 'lib/messaging'
 require 'eventmachine'
+require 'mercury_em_client'
 require 'ap'
 
-CLIENT_COUNT = ARGV[0].to_i
-MSG_COUNT = ARGV[1].to_i
+client_count = ARGV[0].to_i
+msg_count = ARGV[1].to_i
 
-puts "# clients: #{CLIENT_COUNT}"
-puts "# msgs/client: #{MSG_COUNT}"
-
-class Client < EM::Connection
-
-  class << self
-    def completed_client_count
-      @completed_client_count ||= 0
-    end
-
-    def inc_completed_client_count
-      @completed_client_count = completed_client_count + 1
-    end
-  end
-
-  def post_init
-    @pipe = MessagePipe.new(&method(:receive_msg))
-    @count = 0
-  end
-
-  def receive_data(bytes)
-    @pipe.write(bytes)
-  end
-
-  def request(req, &block)
-    send_data(MessagePipe.message_to_bytes(req))
-    @on_msg = block
-  end
-
-  def receive_msg(msg)
-    if @on_msg
-      handler = @on_msg
-      @on_msg = nil # must clear before handler in case handler calls request()
-      handler.(msg)
-    else
-      @count += 1
-      if @count == MSG_COUNT
-        Client.inc_completed_client_count
-        if Client.completed_client_count == CLIENT_COUNT
-          elapsed = Time.now - START
-          #puts "elapsed seconds: #{elapsed}"
-          puts "milliseconds/msg: #{elapsed / (CLIENT_COUNT * MSG_COUNT) * 1000}"
-          puts "messages/second: #{(CLIENT_COUNT * MSG_COUNT) / elapsed}"
-          EM.stop
-        end
-      end
-    end
-  end
-end
+puts "# clients: #{client_count}"
+puts "# msgs/client: #{msg_count}"
 
 def average(xs)
   xs.inject{ |sum, el| sum + el }.to_f / xs.size
@@ -61,7 +15,7 @@ end
 
 def roundtrip(client, remaining, latencies = [])
   request = Ib::Mutex::V1::Request.new(requestor: 'req', owner_name: 'own', resource: Time.now.iso8601(6))
-  client.request(request) do |response|
+  client.send_request(request) do |response|
     if remaining > 0
       roundtrip(client, remaining - 1, latencies.push(Time.now - Time.parse(response.request.resource)))
     else
@@ -72,15 +26,24 @@ def roundtrip(client, remaining, latencies = [])
 end
 
 EM.run do
-  client = EM.connect('127.0.0.1', 7890, Client)
-  roundtrip(client, MSG_COUNT)
+  client = MercuryEMClient.new('127.0.0.1', 7890)
+  roundtrip(client, msg_count)
 end
 
+start = Time.now
 EM.run do
   msg = Ib::Mutex::V1::Request.new(requestor: 'req', owner_name: 'own', resource: 'res')
-  START = Time.now
-  CLIENT_COUNT.times do
-    client = EM.connect('127.0.0.1', 7890, Client)
-    MSG_COUNT.times { client.send_data(MessagePipe.message_to_bytes(msg)) }
+  completed_clients = 0
+  client_count.times do
+    completed_requests = 0
+    client = MercuryEMClient.new('127.0.0.1', 7890) do
+      completed_requests += 1
+      completed_clients += 1 if completed_requests == msg_count
+      EM.stop if completed_clients == client_count
+    end
+    msg_count.times { client.send_message(msg) }
   end
 end
+elapsed = Time.now - start
+puts "milliseconds/msg: #{elapsed / (client_count * msg_count) * 1000}"
+puts "messages/second: #{(client_count * msg_count) / elapsed}"
