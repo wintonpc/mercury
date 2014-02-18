@@ -1,4 +1,4 @@
-class BinBuf
+class ChunkBuffer
   def initialize
     @chunks = []
   end
@@ -7,13 +7,32 @@ class BinBuf
     @chunks << bytes
   end
 
-  def unread_uint(uint)
-    @chunks.unshift([uint].pack('N'))
+  def read_chunk
+    payload_size = read_uint
+    return nil unless payload_size
+
+    payload = read(payload_size)
+    if payload
+      payload
+    else
+      unread_uint(payload_size)
+      nil
+    end
   end
+
+  def self.write_chunk(bytes)
+    [bytes.bytesize].pack('N') + bytes
+  end
+
+  private
 
   def read_uint
     bytes = read(4)
     bytes ? bytes.unpack('N').first : nil
+  end
+
+  def unread_uint(uint)
+    @chunks.unshift([uint].pack('N'))
   end
 
   def read(num_to_read)

@@ -4,17 +4,17 @@ require 'ap'
 
 module Handler
   def post_init
-    @pipe = MsgPipe.new(&method(:receive_msg))
+    @pipe = MessagePipe.new(&method(:receive_msg))
   end
 
   def receive_data(bytes)
-    @pipe.pipe_in(bytes)
+    @pipe.write(bytes)
   end
 
   def receive_msg(msg)
     response = Ib::Mutex::V1::Response.new(request: msg, release_token: 'foo',
                                            was_obtained: false, obtained_abandoned: false)
-    send_data(MsgPipe.write(response))
+    send_data(MessagePipe.message_to_bytes(response))
   end
 
   def unbind

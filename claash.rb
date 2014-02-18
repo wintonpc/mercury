@@ -21,16 +21,16 @@ class Client < EM::Connection
   end
 
   def post_init
-    @pipe = MsgPipe.new(&method(:receive_msg))
+    @pipe = MessagePipe.new(&method(:receive_msg))
     @count = 0
   end
 
   def receive_data(bytes)
-    @pipe.pipe_in(bytes)
+    @pipe.write(bytes)
   end
 
   def request(req, &block)
-    send_data(MsgPipe.write(req))
+    send_data(MessagePipe.message_to_bytes(req))
     @on_msg = block
   end
 
@@ -81,6 +81,6 @@ EM.run do
   START = Time.now
   CLIENT_COUNT.times do
     client = EM.connect('127.0.0.1', 7890, Client)
-    MSG_COUNT.times { client.send_data(MsgPipe.write(msg)) }
+    MSG_COUNT.times { client.send_data(MessagePipe.message_to_bytes(msg)) }
   end
 end
