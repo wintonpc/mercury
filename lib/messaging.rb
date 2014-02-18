@@ -2,6 +2,7 @@ $LOAD_PATH << File.absolute_path(File.dirname(__FILE__))
 
 require 'eventmachine'
 require 'mercury'
+require 'mercury_em'
 require 'messages'
 require 'eventmachine_util'
 require 'message_pipe'
