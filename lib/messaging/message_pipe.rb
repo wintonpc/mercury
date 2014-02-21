@@ -1,4 +1,4 @@
-require 'chunk_buffer'
+require_relative './chunk_buffer'
 
 class MessagePipe
   def initialize(&on_msg)

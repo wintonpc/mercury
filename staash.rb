@@ -1,5 +1,4 @@
-require_relative 'lib/messaging'
-require 'eventmachine'
+require_relative 'lib/everything'
 
 EM.run do
   Mercury::EM.start_message_server(7890) do |request, respond|

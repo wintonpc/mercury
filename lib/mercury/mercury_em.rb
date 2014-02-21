@@ -1,5 +1,4 @@
-require_relative 'messaging'
-require 'message_pipe'
+require 'messaging'
 require 'eventmachine'
 
 class Mercury

@@ -1,6 +1,4 @@
-require_relative 'lib/messaging'
-require 'eventmachine'
-require 'mercury_em_client'
+require_relative 'lib/everything'
 require 'ap'
 
 client_count = ARGV[0].to_i

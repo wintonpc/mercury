@@ -1,4 +1,4 @@
-require_relative 'lib/messaging'
+require_relative 'lib/everything'
 
 EM.run do
   mercury = Mercury.new

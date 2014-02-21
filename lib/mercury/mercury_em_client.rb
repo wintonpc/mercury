@@ -1,4 +1,4 @@
-require_relative 'messaging'
+require 'messaging'
 require 'eventmachine'
 
 class MercuryEMClient
