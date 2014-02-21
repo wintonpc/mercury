@@ -64,6 +64,19 @@ class Mercury
     }
   end
 
+  def start_listener(source_name, &rcv)
+    do_or_defer {
+      with_source(source_name) do |exchange|
+        queue = @channel.queue('', exclusive: true, auto_delete: true, durable: false)
+        queue.bind(exchange) do
+          queue.subscribe(ack: false) do |_, payload|
+            rcv.(WireSerializer.read(payload))
+          end
+        end
+      end
+    }
+  end
+
   private
 
   def write(msg)
