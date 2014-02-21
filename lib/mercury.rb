@@ -32,6 +32,12 @@ class Mercury
     end
   end
 
+  def new_singleton(name = nil, &rcv)
+    s = MercurySingleton.new(self, name, &rcv)
+    do_or_defer {s.connect}
+    s
+  end
+
   def send_to(name, msg)
     do_or_defer {
       @default_exchange.publish(write(msg), routing_key: name)
@@ -44,6 +50,24 @@ class Mercury
         exchange.publish(write(msg), delivery_mode: 2, &block)
       end
     }
+  end
+
+  def start_worker(worker_group, source_name, &rcv)
+    do_or_defer {
+      with_source(source_name) do |exchange|
+        with_work_queue(worker_group, exchange) do |queue|
+          queue.subscribe(ack: true) do |metadata, payload|
+            rcv.(WireSerializer.read(payload), ->{ metadata.ack })
+          end
+        end
+      end
+    }
+  end
+
+  private
+
+  def write(msg)
+    ENV['DEBUG'] ? WireSerializer.write_json(msg) : WireSerializer.write(msg)
   end
 
   def with_source(source_name)
@@ -66,68 +90,48 @@ class Mercury
     end
   end
 
-  def new_singleton(name = nil, &rcv)
-    s = MercurySingleton.new(self, name, &rcv)
-    do_or_defer {s.connect}
-    s
-  end
-
-  def start_worker(worker_group, source_name, &rcv)
-    do_or_defer {
-      with_source(source_name) do |exchange|
-        with_work_queue(worker_group, exchange) do |queue|
-          queue.subscribe(ack: true) do |metadata, payload|
-            rcv.(WireSerializer.read(payload), ->{ metadata.ack })
-          end
-        end
-      end
-    }
-  end
-
-  def self.request(dest_name, make_req, &handle_response)
-    EM.run do
-      mercury = Mercury.new
-      ms = mercury.new_singleton do |msg|
-        handle_response && handle_response.(msg)
-        EM.stop
-      end
-
-      mercury.send_to(dest_name, make_req.respond_to?(:call) ? make_req.(ms.name) : make_req)
-    end
-  end
-
-  def write(msg)
-    ENV['DEBUG'] ? WireSerializer.write_json(msg) : WireSerializer.write(msg)
-  end
 end
 
 class MercurySingleton
-  include Deferrable
-
   attr_accessor :name
 
   def initialize(mercury, name, &rcv)
     @mercury = mercury
-    @name = name || "mercury-singleton-#{SecureRandom.uuid}"
+    @name = name || "mercury-singleton-#{SecureRandom.uuid.gsub('-', '')[0...12]}"
     @rcv = rcv
   end
 
   def connect
     @queue = @mercury.channel.queue(@name, exclusive: true, auto_delete: true, durable: false) do |queue|
-      if @rcv
-        queue.subscribe do |payload|
-          @rcv.(WireSerializer.read(payload))
+      break if @closed
+      queue.subscribe do |payload|
+        break if @closed
+        msg = WireSerializer.read(payload)
+        if @response_handler
+          handler = @response_handler
+          @response_handler = nil
+          handler.call(msg)
+        elsif @rcv
+          @rcv.(msg)
         end
       end
-      do_deferred
     end
   end
 
   def send_to(*args)
+    throw 'was previously closed' if @closed
     @mercury.send_to(*args)
   end
 
+  def request(dest_name, request, &response_handler)
+    throw 'was previously closed' if @closed
+    send_to(dest_name, request)
+    @response_handler = response_handler
+  end
+
   def close
+    return if @closed
+    @closed = true
     @queue and @queue.delete(nowait: true)
   end
 end
