@@ -1,0 +1,6 @@
+package ib.housekeeper.v1;
+
+message BatchLoaded {
+  required string site = 1;
+  required string batch_name = 2;
+}

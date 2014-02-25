@@ -4,6 +4,7 @@ require 'mongoid'
 require 'sinatra/base'
 
 ConvertRequest = Ib::ConverterService::V1::Request
+BatchLoaded = Ib::Housekeeper::V1::BatchLoaded
 
 class App < Sinatra::Base
 
@@ -35,9 +36,12 @@ class App < Sinatra::Base
       puts "got convert notification: #{WireSerializer.to_hash(msg)}"
       Mongoid.override_database("ascent_production_#{msg.request.site}")
       batch = Batch.where(name: msg.request.batch).first
-      sample = batch.samples.first{|s| s.name == msg.request.sample}
+      sample = batch.samples.select{|s| s.name == msg.request.sample}.first
       sample.is_converted = true
       batch.save!
+      if batch.samples.all?{|s| s.is_converted}
+        mercury.publish 'batch-loads', BatchLoaded.new(site: msg.request.site, batch_name: batch.name)
+      end
       ack.()
     end
   end
