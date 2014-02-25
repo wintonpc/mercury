@@ -4,6 +4,7 @@ class Batch
   include Mongoid::Document
 
   field :name
+  field :version
   embeds_many :samples
 end
 

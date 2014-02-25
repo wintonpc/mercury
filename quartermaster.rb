@@ -21,7 +21,7 @@ class App < Sinatra::Base
     site, batch_name, sample_names = msg['site'], msg['batch'], msg['samples']
 
     Mongoid.override_database("ascent_production_#{site}")
-    Batch.create!(name: batch_name, samples: sample_names.map{|s| Sample.new(name: s, is_converted: false)})
+    Batch.create!(name: batch_name, version: 1, samples: sample_names.map{|s| Sample.new(name: s, is_converted: false)})
 
     sample_names.each do |sample_name|
       settings.mercury.publish('convert-requests', ConvertRequest.new(site: site, batch: batch_name, sample: sample_name))
@@ -34,15 +34,24 @@ class App < Sinatra::Base
   def self.start_conversion_listener(mercury)
     mercury.start_worker 'quartermaster-conversion-worker', 'convert-notifications' do |msg, ack|
       puts "got convert notification: #{WireSerializer.to_hash(msg)}"
-      Mongoid.override_database("ascent_production_#{msg.request.site}")
-      batch = Batch.where(name: msg.request.batch).first
-      sample = batch.samples.select{|s| s.name == msg.request.sample}.first
+      req = msg.request
+      Mongoid.override_database("ascent_production_#{req.site}")
+      batch = Batch.where(name: req.batch).first
+      sample = batch.samples.select{|s| s.name == req.sample}.first
       sample.is_converted = true
       batch.save!
-      if batch.samples.all?{|s| s.is_converted}
-        mercury.publish 'batch-loads', BatchLoaded.new(site: msg.request.site, batch_name: batch.name)
-      end
       ack.()
+
+      batch.reload
+      if batch.samples.all?{|s| s.is_converted}
+        MutexClient.request_mutex(mercury, "batch-load/#{req.site}/#{req.batch}/#{batch.version}") do |token|
+          break unless token
+          batch.version += 1
+          batch.save!
+          # do not release. consider it a oneshot
+          mercury.publish 'batch-loads', BatchLoaded.new(site: req.site, batch_name: batch.name)
+        end
+      end
     end
   end
 
