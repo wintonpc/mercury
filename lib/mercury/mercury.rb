@@ -73,10 +73,6 @@ class Mercury
     end
   end
 
-  def make_received_message(payload, metadata, is_ackable)
-    ReceivedMessage.new(read(payload), metadata, is_ackable: is_ackable)
-  end
-
   def delete_source(source_name, &k)
     with_source(source_name) do |exchange|
       exchange.delete do
@@ -110,6 +106,10 @@ class Mercury
   end
 
   private
+
+  def make_received_message(payload, metadata, is_ackable)
+    ReceivedMessage.new(read(payload), metadata, is_ackable: is_ackable)
+  end
 
   def existence_check(k, &check)
     AMQP::Channel.new(@amqp) do |ch|

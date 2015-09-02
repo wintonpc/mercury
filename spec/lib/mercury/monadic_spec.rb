@@ -5,6 +5,7 @@ require 'mercury/monadic'
 
 describe Mercury::Monadic do
   include Cps::Methods
+  include MercuryFakeSpec
 
   let!(:source1) { 'test-exchange1' }
   let!(:source2) { 'test-exchange2' }
@@ -27,7 +28,7 @@ describe Mercury::Monadic do
   # one without testing the other. Consequently, these tests verify
   # system behavior rather than method contracts.
 
-  it 'sends and receives messages' do
+  itt 'sends and receives messages' do
     test_with_mercury do |m|
       msgs = []
       seql do
@@ -45,7 +46,7 @@ describe Mercury::Monadic do
     end
   end
 
-  it 'sends and receives tagged messages' do
+  itt 'sends and receives tagged messages' do
     test_with_mercury do |m|
       msgs = []
       seql do
@@ -64,7 +65,7 @@ describe Mercury::Monadic do
     end
   end
 
-  it 'uses AMQP-style tag filters' do
+  itt 'uses AMQP-style tag filters' do
     test_with_mercury do |m|
       successes = []
       failures = []
@@ -96,7 +97,7 @@ describe Mercury::Monadic do
     end
   end
 
-  it 'workers share a queue' do
+  itt 'workers share a queue' do
     test_with_mercury do |m|
       seql do
         let(:m2) { Mercury::Monadic.open }
@@ -113,7 +114,7 @@ describe Mercury::Monadic do
     end
   end
 
-  it 'workers can specify tag filters' do
+  itt 'workers can specify tag filters' do
     test_with_mercury do |m|
       seql do
         let(:m2) { Mercury::Monadic.open }
@@ -140,7 +141,7 @@ describe Mercury::Monadic do
     end
   end
 
-  it 'a worker must ack before receiving another message' do
+  itt 'a worker must ack before receiving another message' do
     test_with_mercury do |m|
       msgs = []
       seql do
@@ -155,7 +156,7 @@ describe Mercury::Monadic do
     end
   end
 
-  it 'rejected messages are not requeued' do
+  itt 'rejected messages are not requeued' do
     test_with_mercury do |m|
       msgs = []
       seql do
@@ -201,7 +202,7 @@ describe Mercury::Monadic do
   end
 
   describe '#delete_source' do
-    it 'deletes the source if it exists' do
+    itt 'deletes the source if it exists' do
       test_with_mercury do |m|
         seql do
           and_then { m.start_listener(source) }
@@ -213,7 +214,7 @@ describe Mercury::Monadic do
         end
       end
     end
-    it 'does nothing if the source does not exist' do
+    itt 'does nothing if the source does not exist' do
       test_with_mercury do |m|
         seql do
           and_then { m.delete_source(source)  }
@@ -225,7 +226,7 @@ describe Mercury::Monadic do
   end
 
   describe '#delete_work_queue' do
-    it 'deletes the queue if it exists' do
+    itt 'deletes the queue if it exists' do
       test_with_mercury do |m|
         seql do
           and_then { m.start_worker(queue, source) }
@@ -237,7 +238,7 @@ describe Mercury::Monadic do
         end
       end
     end
-    it 'does nothing if the queue does not exist' do
+    itt 'does nothing if the queue does not exist' do
       test_with_mercury do |m|
         seql do
           and_then { m.delete_work_queue(queue)    }
@@ -249,7 +250,7 @@ describe Mercury::Monadic do
   end
 
   describe '#source_exists?' do
-    it 'returns false when the source does not exist' do
+    itt 'returns false when the source does not exist' do
       test_with_mercury do |m|
         m.source_exists?('asdf').
           and_lift { |result| expect(result).to be false }
@@ -265,14 +266,14 @@ describe Mercury::Monadic do
   end
 
   describe '#queue_exists?' do
-    it 'returns false when the queue does not exist' do
+    itt 'returns false when the queue does not exist' do
       test_with_mercury do |m|
         m.queue_exists?('asdf').
           and_lift { |result| expect(result).to be false }
       end
     end
 
-    it 'returns true when the source exists' do
+    itt 'returns true when the source exists' do
       test_with_mercury do |m|
         m.start_worker(queue1, source1, proc{}).
           and_then { m.queue_exists?(queue1) }.

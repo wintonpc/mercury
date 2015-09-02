@@ -34,7 +34,9 @@ class Cps
   def and_then(&pm)
     Cps.new do |*args, &k|
       self.run(*args) do |*args2|
-        pm.call(*args2).run(&k)
+        next_cps = pm.call(*args2)
+        next_cps.is_a?(Cps) or raise "`and_then` block did not return a Cps. Did you want `and_lift`? at #{pm.source_location}"
+        next_cps.run(&k)
       end
     end
   end

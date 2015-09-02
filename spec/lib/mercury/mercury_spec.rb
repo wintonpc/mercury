@@ -2,6 +2,7 @@ require 'spec_helper'
 require 'mercury'
 
 describe Mercury do
+  include MercuryFakeSpec
 
   # These tests just cover the basics. Most of the testing is
   # done in the Mercury::Monadic spec for convenience.
@@ -24,7 +25,7 @@ describe Mercury do
   end
 
   describe '#close' do
-    it 'closes the connection' do
+    itt 'closes the connection' do
       em do
         Mercury.open do |m|
           m.close do
@@ -37,7 +38,7 @@ describe Mercury do
   end
 
   describe '#start_listener' do
-    it 'listens for messages' do
+    itt 'listens for messages' do
       with_mercury do |m|
         received = []
         m.start_listener(source, received.method(:push)) do
@@ -56,7 +57,7 @@ describe Mercury do
   end
 
   describe '#start_worker' do
-    it 'listens for messages' do
+    itt 'listens for messages' do
       with_mercury do |m|
         received = []
         m.start_worker(queue, source, received.method(:push)) do
