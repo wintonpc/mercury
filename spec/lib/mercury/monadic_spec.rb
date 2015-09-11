@@ -170,6 +170,19 @@ describe Mercury::Monadic do
     end
   end
 
+  itt 'nacked messages are requeued' do
+    test_with_mercury do |m|
+      msgs = []
+      seql do
+        and_then { m.start_worker(worker, source, &msgs.method(:push)) }
+        and_then { m.publish(source, msg) }
+        and_then { wait_until { msgs.size == 1 } }
+        and_lift { msgs[0].nack }
+        and_then { wait_until { msgs.size == 2} }
+      end
+    end
+  end
+
   it 'unacked messages are requeued (client failure)' do
     test_with_mercury do |m|
       msgs = []

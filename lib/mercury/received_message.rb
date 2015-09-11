@@ -21,5 +21,10 @@ class Mercury
       @is_ackable or raise 'This message is not rejectable'
       metadata.reject(requeue: false)
     end
+
+    def nack
+      @is_ackable or raise 'This message is not nackable'
+      metadata.reject(requeue: true)
+    end
   end
 end

@@ -8,11 +8,7 @@ class Mercury
       attr_accessor :delivered, :subscriber
 
       def initialize(queue, msg, tag, is_ackable)
-        metadata = Metadata.new(tag) do
-          # ReceivedMessage guarantees this is only called for work queues
-          subscriber.busy = false
-          queue.ack_or_reject_message(self)
-        end
+        metadata = Metadata.new(tag, proc{queue.ack_or_reject_message(self)}, proc{queue.nack(self)})
         @received_msg = ReceivedMessage.new(msg, metadata, is_ackable: is_ackable)
         @delivered = false
       end

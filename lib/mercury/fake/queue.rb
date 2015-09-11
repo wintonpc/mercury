@@ -27,7 +27,14 @@ class Mercury
 
       def ack_or_reject_message(msg)
         msgs.delete(msg) or raise 'tried to delete message that was not in queue!!'
+        msg.subscriber.busy = false
         deliver # a subscriber just freed up
+      end
+
+      def nack(msg)
+        msg.delivered = false
+        msg.subscriber.busy = false
+        deliver
       end
 
       def binds?(source_name, tag)
