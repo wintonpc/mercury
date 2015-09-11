@@ -8,6 +8,14 @@ class Cps
     # 1. we can simulate local let-bound variables, and
     # 2. the block can access variables and methods available
     #    outside the call to seql.
+    #
+    # To achieve this, we instance_exec the block in a SeqWithLet
+    # object, which provides the let bound variables (as methods)
+    # and uses method_missing to proxy other methods to the parent
+    # binding.
+    #
+    # Note: parent instance variables are not available inside the block.
+    # Note: keyword arguments are not proxied to methods called in the parent binding
     context = SeqWithLet.new(binding.of_caller(depth))
     context.instance_exec(&block)
     context.__chain
@@ -40,16 +48,15 @@ class Cps
     end
 
     def method_missing(name, *args, &block)
-      # puts "method_missing(#{name}, #{args})"
       __values.fetch(name) { __parent_call(name.to_s, *args, &block) }
     end
 
     def __parent_call(name, *args, &block)
-      @__parent_caller ||= @__parent_binding.eval <<EOD
+      @__parent_caller ||= @__parent_binding.eval <<-EOD
       proc do |name, *args, &block|
         send(name, *args, &block)
       end
-EOD
+      EOD
       @__parent_caller.call(name, *args, &block)
     end
 

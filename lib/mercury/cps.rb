@@ -1,6 +1,7 @@
 require 'mercury/cps/seq'
 require 'mercury/cps/seq_with_let'
 require 'mercury/cps/methods'
+require 'mercury/utils'
 
 # Async IO often involves CPS (continuation-passing style)
 # code, where the continuation (a.k.a. "callback") is passed
@@ -62,9 +63,7 @@ class Cps
   # Once all complete, their return values are passed to the continuation
   # in an array with positions corresponding to the provided Cpses.
   def self.concurrently(*cpss)
-    if cpss.size == 1 && cpss.is_a?(Array) # allow splatted or non-splatted
-      cpss = cpss.first
-    end
+    cpss = Utils.unsplat(cpss)
 
     Cps.new do |*in_args, &k|
       pending_completions = cpss

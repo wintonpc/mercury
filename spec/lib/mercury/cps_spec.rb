@@ -132,6 +132,32 @@ describe Cps do
       end.run
       expect(result).to eql '123'
     end
+    it 'block can access outer methods' do
+      Cps.seql do
+        expect(foo).to eql 'foo'
+      end
+    end
+    def foo
+      'foo'
+    end
+    it 'block can access outer variables' do
+      bar = 'bar'
+      Cps.seql do
+        expect(bar).to eql 'bar'
+      end
+    end
+    it 'block cannot access outer instance variables' do
+      @baz = 'baz'
+      Cps.seql do
+        expect(@baz).to eql nil
+      end
+    end
+    it 'foo' do
+      Cps.seql do
+        expect(FLIP).to eql 'flip'
+      end
+    end
+    FLIP = 'flip'
   end
 
   describe '::identity' do

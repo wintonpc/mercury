@@ -7,15 +7,6 @@ class Cps
     s.m
   end
 
-  # # Syntactic sugar for and_then chains.
-  # def self.seqp(&block)
-  #   proc do |*args|
-  #     s = Seq.new
-  #     block.call(s.method(:chain), *args)
-  #     s.m
-  #   end
-  # end
-
   class Seq
     def m
       @m ||= Cps.identity # we need an initial Cps to chain onto
