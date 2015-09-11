@@ -282,6 +282,14 @@ describe Mercury::Monadic do
     end
   end
 
+  describe '#open' do
+    it 'relays args to Mercury.open' do
+      logger = double
+      expect(Mercury).to receive(:open).with(logger: logger, host: 'asdf')
+      Mercury::Monadic.open(logger: logger, host: 'asdf').run
+    end
+  end
+
   # the block must return a Cps
   def test_with_mercury(&block)
     sources = [source1, source2]

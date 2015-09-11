@@ -4,9 +4,9 @@ require 'mercury/cps'
 class Mercury
   class Monadic
 
-    def self.open
+    def self.open(**kws)
       Cps.new do |&k|
-        Mercury.open do |m|
+        Mercury.open(**kws) do |m|
           k.call(new(m))
         end
       end
