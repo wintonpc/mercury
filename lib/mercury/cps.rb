@@ -25,7 +25,7 @@ class Cps
   # is not needed, the continuation k may be omitted.
   # Returns the return value of the continuation.
   def run(*args, &k)
-    k ||= proc{|x| x}
+    k ||= proc { |x| x }
     cps.call(*args, &k)
   end
 
@@ -36,7 +36,7 @@ class Cps
     Cps.new do |*args, &k|
       self.run(*args) do |*args2|
         next_cps = pm.call(*args2)
-        next_cps.is_a?(Cps) or raise "`and_then` block did not return a Cps. Did you want `and_lift`? at #{pm.source_location}"
+        next_cps.is_a?(Cps) or raise "'and_then' block did not return a Cps. Did you want 'and_lift'? at #{pm.source_location}"
         next_cps.run(&k)
       end
     end

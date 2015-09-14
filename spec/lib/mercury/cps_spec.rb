@@ -152,7 +152,7 @@ describe Cps do
         expect(@baz).to eql nil
       end
     end
-    it 'foo' do
+    it 'block can access outer constants' do
       Cps.seql do
         expect(FLIP).to eql 'flip'
       end
